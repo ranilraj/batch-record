@@ -1,4 +1,4 @@
-const CACHE_NAME = 'batch-record-v2';
+const CACHE_NAME = 'batch-record-v3';
 const ASSETS = [
   './',
   './index.html',
