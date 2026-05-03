@@ -1,6 +1,7 @@
 /* =============================================
    BATCH RECORD — Core Application Logic
-   Handles: CRUD, Navigation, Calculations, Storage
+   Cloud Sync via Firebase Firestore
+   Handles: CRUD, Navigation, Calculations, Sync
    ============================================= */
 
 (function () {
@@ -10,6 +11,9 @@
   const DEFAULT_CATEGORIES = [
     'Casted', 'Runner', 'Cutting', 'Stone', 'Fitting', 'Plating'
   ];
+
+  // ── Firestore reference ──
+  const batchesRef = db.collection('batches');
 
   // ── State ──
   let batches = [];
@@ -30,11 +34,10 @@
 
   // ── Init ──
   function init() {
-    loadData();
     setTodayDate();
     buildExpenseRows();
     bindEvents();
-    renderDashboard();
+    listenToBatches(); // Real-time Firestore listener
     registerSW();
   }
 
@@ -45,8 +48,37 @@
     }
   }
 
-  // ── LocalStorage ──
-  function loadData() {
+  // ── Firestore: Real-time Listener ──
+  // This listens for ALL changes (add/edit/delete) from any device
+  function listenToBatches() {
+    batchesRef.orderBy('createdAt', 'desc').onSnapshot(
+      (snapshot) => {
+        batches = [];
+        snapshot.forEach((doc) => {
+          batches.push({ id: doc.id, ...doc.data() });
+        });
+        // Re-render whatever screen is currently active
+        renderDashboard();
+        if (screens.history.classList.contains('active')) {
+          renderHistory();
+        }
+        if (screens.detail.classList.contains('active') && editingBatchId) {
+          const updated = batches.find((b) => b.id === editingBatchId);
+          if (updated) openDetail(updated.id);
+        }
+      },
+      (error) => {
+        console.error('Firestore listen error:', error);
+        showToast('Sync error — using local data');
+        // Fallback to localStorage
+        loadLocalData();
+        renderDashboard();
+      }
+    );
+  }
+
+  // ── LocalStorage fallback ──
+  function loadLocalData() {
     try {
       const raw = localStorage.getItem('batchRecordData');
       batches = raw ? JSON.parse(raw) : [];
@@ -55,7 +87,7 @@
     }
   }
 
-  function saveData() {
+  function saveLocalBackup() {
     localStorage.setItem('batchRecordData', JSON.stringify(batches));
   }
 
@@ -130,7 +162,6 @@
       $('#deleteModal').classList.add('hidden');
       showScreen('history');
       renderHistory();
-      showToast('Batch deleted');
     });
 
     // Search
@@ -157,13 +188,11 @@
     customCategoryCount = 0;
 
     if (expenses && expenses.length > 0) {
-      // Editing — restore existing categories
       expenses.forEach((exp) => {
         const isDefault = DEFAULT_CATEGORIES.includes(exp.name);
         addExpenseRowToDOM(exp.name, exp.amount, !isDefault);
       });
     } else {
-      // New — use defaults
       DEFAULT_CATEGORIES.forEach((cat) => {
         addExpenseRowToDOM(cat, '', false);
       });
@@ -197,7 +226,6 @@
 
     container.appendChild(row);
 
-    // Bind input event for recalc
     row.querySelectorAll('.expense-amount').forEach((inp) => {
       inp.addEventListener('input', recalcTotals);
     });
@@ -287,7 +315,7 @@
     showScreen('form');
   }
 
-  // ── Save / Update Batch ──
+  // ── Save / Update Batch (Firestore) ──
   function saveBatch() {
     const name = $('#batchName').value.trim();
     const date = $('#batchDate').value;
@@ -305,7 +333,6 @@
     const profitPct = totalCost > 0 ? ((profitLoss / totalCost) * 100) : 0;
 
     const batchData = {
-      id: editingBatchId || generateId(),
       name,
       date,
       expenses,
@@ -313,39 +340,56 @@
       sellingPrice,
       profitLoss,
       profitPct,
-      createdAt: editingBatchId
-        ? batches.find((b) => b.id === editingBatchId)?.createdAt || Date.now()
-        : Date.now(),
       updatedAt: Date.now()
     };
 
     if (editingBatchId) {
-      const idx = batches.findIndex((b) => b.id === editingBatchId);
-      if (idx !== -1) batches[idx] = batchData;
+      // Update existing document in Firestore
+      batchesRef.doc(editingBatchId).update(batchData)
+        .then(() => {
+          showToast('Batch updated! ☁️');
+          editingBatchId = null;
+          showScreen('dashboard');
+        })
+        .catch((err) => {
+          console.error('Update error:', err);
+          showToast('Error updating — try again');
+        });
     } else {
-      batches.push(batchData);
+      // Add new document to Firestore
+      batchData.createdAt = Date.now();
+      batchesRef.add(batchData)
+        .then(() => {
+          showToast('Batch saved! ☁️');
+          editingBatchId = null;
+          showScreen('dashboard');
+        })
+        .catch((err) => {
+          console.error('Save error:', err);
+          showToast('Error saving — try again');
+        });
     }
-
-    saveData();
-    showToast(editingBatchId ? 'Batch updated!' : 'Batch saved!');
-    editingBatchId = null;
-    showScreen('dashboard');
-    renderDashboard();
   }
 
-  // ── Delete Batch ──
+  // ── Delete Batch (Firestore) ──
   function deleteBatch(id) {
-    batches = batches.filter((b) => b.id !== id);
-    saveData();
-    editingBatchId = null;
+    if (!id) return;
+    batchesRef.doc(id).delete()
+      .then(() => {
+        showToast('Batch deleted ☁️');
+        editingBatchId = null;
+      })
+      .catch((err) => {
+        console.error('Delete error:', err);
+        showToast('Error deleting — try again');
+      });
   }
 
   // ── Render Dashboard ──
   function renderDashboard() {
-    // Summary values
     const total = batches.length;
-    const totalSpend = batches.reduce((s, b) => s + b.totalCost, 0);
-    const totalRevenue = batches.reduce((s, b) => s + b.sellingPrice, 0);
+    const totalSpend = batches.reduce((s, b) => s + (b.totalCost || 0), 0);
+    const totalRevenue = batches.reduce((s, b) => s + (b.sellingPrice || 0), 0);
     const completedBatches = batches.filter((b) => b.sellingPrice > 0);
     const avgProfit = completedBatches.length > 0
       ? completedBatches.reduce((s, b) => s + b.profitPct, 0) / completedBatches.length
@@ -358,8 +402,11 @@
     $('#totalRevenue').innerHTML = `<span class="rupee">₹</span>${formatNum(totalRevenue)}`;
 
     // Recent batches (last 5)
-    const recent = [...batches].sort((a, b) => b.createdAt - a.createdAt).slice(0, 5);
+    const recent = [...batches].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 5);
     renderBatchList($('#recentBatchList'), recent, true);
+
+    // Keep local backup
+    saveLocalBackup();
   }
 
   // ── Render History ──
@@ -369,19 +416,18 @@
 
     if (query) {
       filtered = batches.filter((b) =>
-        b.name.toLowerCase().includes(query) || b.date.includes(query)
+        b.name.toLowerCase().includes(query) || (b.date && b.date.includes(query))
       );
     }
 
-    // Sort
     filtered = [...filtered].sort((a, b) => {
       switch (currentSort) {
-        case 'date-desc': return b.createdAt - a.createdAt;
-        case 'date-asc': return a.createdAt - b.createdAt;
-        case 'profit-desc': return b.profitPct - a.profitPct;
-        case 'profit-asc': return a.profitPct - b.profitPct;
-        case 'cost-desc': return b.totalCost - a.totalCost;
-        default: return b.createdAt - a.createdAt;
+        case 'date-desc': return (b.createdAt || 0) - (a.createdAt || 0);
+        case 'date-asc': return (a.createdAt || 0) - (b.createdAt || 0);
+        case 'profit-desc': return (b.profitPct || 0) - (a.profitPct || 0);
+        case 'profit-asc': return (a.profitPct || 0) - (b.profitPct || 0);
+        case 'cost-desc': return (b.totalCost || 0) - (a.totalCost || 0);
+        default: return (b.createdAt || 0) - (a.createdAt || 0);
       }
     });
 
@@ -423,7 +469,6 @@
         </div>`;
     }).join('');
 
-    // Bind click on cards
     container.querySelectorAll('.batch-card').forEach((card) => {
       card.addEventListener('click', () => {
         openDetail(card.dataset.id);
@@ -441,7 +486,6 @@
     $('#detailName').textContent = batch.name;
     $('#detailDate').textContent = formatDate(batch.date);
 
-    // Profit summary
     const pctEl = $('#detailProfitPct');
     if (batch.sellingPrice > 0) {
       pctEl.textContent = (batch.profitLoss >= 0 ? '+' : '') + batch.profitPct.toFixed(1) + '%';
@@ -454,9 +498,8 @@
       $('#detailProfitSummary').style.borderColor = 'var(--border)';
     }
 
-    // Expense breakdown
     const expContainer = $('#detailExpenseRows');
-    expContainer.innerHTML = batch.expenses
+    expContainer.innerHTML = (batch.expenses || [])
       .filter((e) => e.amount > 0)
       .map((e) => `
         <div class="detail-row">
@@ -465,7 +508,7 @@
         </div>
       `).join('');
 
-    $('#detailTotalCost').textContent = '₹' + formatNum(batch.totalCost);
+    $('#detailTotalCost').textContent = '₹' + formatNum(batch.totalCost || 0);
     $('#detailSellingPrice').textContent = batch.sellingPrice > 0 ? '₹' + formatNum(batch.sellingPrice) : '—';
 
     const plEl = $('#detailProfitLoss');
@@ -497,16 +540,15 @@
     }
 
     let csv = 'Batch Name,Date,';
-    // Get all unique categories
     const allCategories = new Set();
-    batches.forEach((b) => b.expenses.forEach((e) => allCategories.add(e.name)));
+    batches.forEach((b) => (b.expenses || []).forEach((e) => allCategories.add(e.name)));
     const cats = [...allCategories];
     csv += cats.join(',') + ',Total Cost,Selling Price,Profit/Loss,Profit %\n';
 
     batches.forEach((b) => {
       csv += `"${b.name}",${b.date},`;
       cats.forEach((cat) => {
-        const exp = b.expenses.find((e) => e.name === cat);
+        const exp = (b.expenses || []).find((e) => e.name === cat);
         csv += (exp ? exp.amount : 0) + ',';
       });
       csv += `${b.totalCost},${b.sellingPrice},${b.profitLoss},${b.profitPct.toFixed(1)}%\n`;
@@ -523,10 +565,6 @@
   }
 
   // ── Helpers ──
-  function generateId() {
-    return 'b_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
-  }
-
   function setTodayDate() {
     const today = new Date();
     const yyyy = today.getFullYear();
@@ -536,7 +574,7 @@
   }
 
   function formatNum(n) {
-    if (n === 0) return '0';
+    if (!n || n === 0) return '0';
     return n.toLocaleString('en-IN');
   }
 
@@ -552,7 +590,7 @@
 
   function escapeHtml(str) {
     const div = document.createElement('div');
-    div.textContent = str;
+    div.textContent = str || '';
     return div.innerHTML;
   }
 
