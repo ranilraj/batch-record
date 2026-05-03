@@ -12,8 +12,9 @@
     'Casted', 'Runner', 'Cutting', 'Stone', 'Fitting', 'Plating'
   ];
 
-  // ── Firestore reference ──
-  const batchesRef = db.collection('batches');
+  // ── Firestore reference (safe init) ──
+  const hasFirestore = typeof db !== 'undefined';
+  const batchesRef = hasFirestore ? db.collection('batches') : null;
 
   // ── State ──
   let batches = [];
@@ -37,7 +38,14 @@
     setTodayDate();
     buildExpenseRows();
     bindEvents();
-    listenToBatches(); // Real-time Firestore listener
+    if (hasFirestore) {
+      listenToBatches(); // Real-time Firestore listener
+    } else {
+      // Fallback: no Firebase, use localStorage
+      console.warn('Firebase not available — using local storage');
+      loadLocalData();
+      renderDashboard();
+    }
     registerSW();
   }
 
@@ -343,46 +351,59 @@
       updatedAt: Date.now()
     };
 
-    if (editingBatchId) {
-      // Update existing document in Firestore
-      batchesRef.doc(editingBatchId).update(batchData)
-        .then(() => {
+    if (hasFirestore && batchesRef) {
+      try {
+        if (editingBatchId) {
+          batchesRef.doc(editingBatchId).update(batchData).catch((err) => {
+            console.error('Update error:', err);
+          });
           showToast('Batch updated! ☁️');
-          editingBatchId = null;
-          showScreen('dashboard');
-        })
-        .catch((err) => {
-          console.error('Update error:', err);
-          showToast('Error updating — try again');
-        });
-    } else {
-      // Add new document to Firestore
-      batchData.createdAt = Date.now();
-      batchesRef.add(batchData)
-        .then(() => {
+        } else {
+          batchData.createdAt = Date.now();
+          batchesRef.add(batchData).catch((err) => {
+            console.error('Save error:', err);
+          });
           showToast('Batch saved! ☁️');
-          editingBatchId = null;
-          showScreen('dashboard');
-        })
-        .catch((err) => {
-          console.error('Save error:', err);
-          showToast('Error saving — try again');
-        });
+        }
+      } catch (err) {
+        console.error('Save error:', err);
+        showToast('Error — please try again');
+        return;
+      }
+    } else {
+      // Fallback: save to localStorage
+      if (editingBatchId) {
+        const idx = batches.findIndex((b) => b.id === editingBatchId);
+        if (idx !== -1) batches[idx] = { id: editingBatchId, ...batchData };
+      } else {
+        batchData.createdAt = Date.now();
+        batchData.id = 'b_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
+        batches.push(batchData);
+      }
+      saveLocalBackup();
+      renderDashboard();
+      showToast(editingBatchId ? 'Batch updated!' : 'Batch saved!');
     }
+
+    // Navigate immediately — Firestore offline cache + onSnapshot handles the rest
+    editingBatchId = null;
+    showScreen('dashboard');
   }
 
   // ── Delete Batch (Firestore) ──
   function deleteBatch(id) {
     if (!id) return;
-    batchesRef.doc(id).delete()
-      .then(() => {
-        showToast('Batch deleted ☁️');
-        editingBatchId = null;
-      })
-      .catch((err) => {
+    if (hasFirestore && batchesRef) {
+      batchesRef.doc(id).delete().catch((err) => {
         console.error('Delete error:', err);
-        showToast('Error deleting — try again');
       });
+      showToast('Batch deleted ☁️');
+    } else {
+      batches = batches.filter((b) => b.id !== id);
+      saveLocalBackup();
+      showToast('Batch deleted');
+    }
+    editingBatchId = null;
   }
 
   // ── Render Dashboard ──
