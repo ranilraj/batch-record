@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#0f1118">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="description" content="Track batch-wise expenses and profit for jewelry covering business">
+  <title>Batch Record — Expense & Profit Tracker</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app" id="app">
+
+    <!-- Header -->
+    <header class="header">
+      <div>
+        <div class="header-title">Batch Record</div>
+        <div class="header-subtitle">Expense & Profit Tracker</div>
+      </div>
+      <button class="header-action" id="headerActionBtn" title="Export Data">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      </button>
+    </header>
+
+    <!-- ==================== DASHBOARD SCREEN ==================== -->
+    <section class="screen active" id="screenDashboard">
+
+      <!-- Summary Cards -->
+      <div class="summary-grid" id="summaryGrid">
+        <div class="summary-card gold">
+          <div class="summary-icon">📦</div>
+          <div class="summary-value" id="totalBatches">0</div>
+          <div class="summary-label">Total Batches</div>
+        </div>
+        <div class="summary-card gold">
+          <div class="summary-icon">💰</div>
+          <div class="summary-value" id="totalSpend"><span class="rupee">₹</span>0</div>
+          <div class="summary-label">Total Spend</div>
+        </div>
+        <div class="summary-card green">
+          <div class="summary-icon">📈</div>
+          <div class="summary-value" id="avgProfit">0%</div>
+          <div class="summary-label">Avg Profit</div>
+        </div>
+        <div class="summary-card red">
+          <div class="summary-icon">📊</div>
+          <div class="summary-value" id="totalRevenue"><span class="rupee">₹</span>0</div>
+          <div class="summary-label">Total Revenue</div>
+        </div>
+      </div>
+
+      <!-- Recent Batches -->
+      <div class="section-title">Recent Batches</div>
+      <div class="batch-list" id="recentBatchList">
+        <div class="empty-state">
+          <div class="empty-icon">📋</div>
+          <div class="empty-title">No batches yet</div>
+          <div class="empty-text">Tap the + button to create your first batch</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== NEW/EDIT BATCH SCREEN ==================== -->
+    <section class="screen form-screen" id="screenForm">
+      <div class="detail-header">
+        <button class="back-btn" id="formBackBtn">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <div>
+          <div class="detail-title" id="formTitle">New Batch</div>
+          <div class="detail-date" id="formSubtitle">Add batch expenses</div>
+        </div>
+      </div>
+
+      <!-- Batch Info -->
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="batchName">Batch Name</label>
+          <input class="form-input" type="text" id="batchName" placeholder="e.g. SD Covering">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="batchDate">Date</label>
+          <input class="form-input" type="date" id="batchDate">
+        </div>
+      </div>
+
+      <!-- Expense Categories -->
+      <div class="expense-section">
+        <div class="expense-section-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v12M6 12h12"/></svg>
+          Expenses
+        </div>
+        <div id="expenseRows">
+          <!-- Default expense rows added by JS -->
+        </div>
+        <button class="add-expense-btn" id="addExpenseBtn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add Custom Category
+        </button>
+      </div>
+
+      <!-- Selling Price -->
+      <div class="form-group">
+        <label class="form-label" for="sellingPrice">Selling Price (₹)</label>
+        <input class="form-input" type="number" id="sellingPrice" placeholder="Enter selling price" inputmode="numeric">
+      </div>
+
+      <!-- Auto Totals -->
+      <div class="totals-section" id="totalsSection">
+        <div class="total-row">
+          <span class="total-label">Total Cost</span>
+          <span class="total-value gold" id="formTotalCost"><span class="rupee">₹</span>0</span>
+        </div>
+        <div class="total-row">
+          <span class="total-label">Profit / Loss</span>
+          <span class="total-value" id="formProfitLoss"><span class="rupee">₹</span>0</span>
+        </div>
+        <div class="total-row">
+          <span class="total-label">Profit %</span>
+          <span class="total-value" id="formProfitPct">0%</span>
+        </div>
+      </div>
+
+      <!-- Save Button -->
+      <button class="btn btn-primary" id="saveBatchBtn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        Save Batch
+      </button>
+    </section>
+
+    <!-- ==================== HISTORY SCREEN ==================== -->
+    <section class="screen" id="screenHistory">
+      <div class="search-bar">
+        <span class="search-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </span>
+        <input type="text" id="searchInput" placeholder="Search batches...">
+      </div>
+
+      <div class="sort-chips" id="sortChips">
+        <button class="sort-chip active" data-sort="date-desc">Latest</button>
+        <button class="sort-chip" data-sort="date-asc">Oldest</button>
+        <button class="sort-chip" data-sort="profit-desc">High Profit</button>
+        <button class="sort-chip" data-sort="profit-asc">Low Profit</button>
+        <button class="sort-chip" data-sort="cost-desc">High Cost</button>
+      </div>
+
+      <div class="batch-list" id="historyBatchList">
+        <div class="empty-state">
+          <div class="empty-icon">📋</div>
+          <div class="empty-title">No batches yet</div>
+          <div class="empty-text">Create batches to see them here</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== DETAIL SCREEN ==================== -->
+    <section class="screen" id="screenDetail">
+      <div class="detail-header">
+        <button class="back-btn" id="detailBackBtn">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <div>
+          <div class="detail-title" id="detailName">Batch Name</div>
+          <div class="detail-date" id="detailDate">Date</div>
+        </div>
+      </div>
+
+      <!-- Profit Summary -->
+      <div class="profit-summary" id="detailProfitSummary">
+        <div class="profit-summary-value" id="detailProfitPct">0%</div>
+        <div class="profit-summary-label">Profit Percentage</div>
+      </div>
+
+      <!-- Expense Breakdown -->
+      <div class="detail-card">
+        <div class="detail-card-title">💎 Expense Breakdown</div>
+        <div id="detailExpenseRows"></div>
+        <div class="detail-row" style="border-top: 2px solid var(--border); margin-top: 4px; padding-top: 12px;">
+          <span class="detail-row-label" style="font-weight:700; color: var(--gold-primary);">Total Cost</span>
+          <span class="detail-row-value" id="detailTotalCost" style="color: var(--gold-primary);">₹0</span>
+        </div>
+      </div>
+
+      <!-- Revenue & Profit -->
+      <div class="detail-card">
+        <div class="detail-card-title">📊 Revenue & Profit</div>
+        <div class="detail-row">
+          <span class="detail-row-label">Selling Price</span>
+          <span class="detail-row-value" id="detailSellingPrice">₹0</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-row-label">Profit / Loss</span>
+          <span class="detail-row-value" id="detailProfitLoss">₹0</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-row-label">Profit %</span>
+          <span class="detail-row-value" id="detailProfitPctRow">0%</span>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="btn-group">
+        <button class="btn btn-secondary" id="editBatchBtn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          Edit
+        </button>
+        <button class="btn btn-danger" id="deleteBatchBtn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          Delete
+        </button>
+      </div>
+    </section>
+
+    <!-- ==================== BOTTOM NAVIGATION ==================== -->
+    <nav class="bottom-nav" id="bottomNav">
+      <button class="nav-item active" data-screen="screenDashboard" id="navDashboard">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        <span class="nav-label">Home</span>
+      </button>
+
+      <div class="fab-nav">
+        <button class="fab-btn" id="navNewBatch" title="New Batch">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+        <span class="nav-label">New</span>
+      </div>
+
+      <button class="nav-item" data-screen="screenHistory" id="navHistory">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span class="nav-label">History</span>
+      </button>
+    </nav>
+
+    <!-- ==================== DELETE CONFIRMATION MODAL ==================== -->
+    <div class="modal-overlay hidden" id="deleteModal">
+      <div class="modal">
+        <div class="modal-title">Delete Batch?</div>
+        <div class="modal-text">This action cannot be undone. Are you sure you want to delete this batch record?</div>
+        <div class="btn-group">
+          <button class="btn btn-secondary" id="cancelDeleteBtn">Cancel</button>
+          <button class="btn btn-danger" id="confirmDeleteBtn">Delete</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== TOAST ==================== -->
+    <div class="toast" id="toast">Saved!</div>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
