@@ -13,8 +13,8 @@
   ];
 
   // ── Firestore reference (safe init) ──
-  const hasFirestore = typeof db !== 'undefined';
-  const batchesRef = hasFirestore ? db.collection('batches') : null;
+  const hasFirestore = typeof window.db !== 'undefined';
+  const batchesRef = hasFirestore ? window.db.collection('batches') : null;
 
   // ── State ──
   let batches = [];
